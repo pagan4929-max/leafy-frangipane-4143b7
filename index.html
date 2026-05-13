@@ -1,3 +1,4 @@
+
 <!DOCTYPE html>
 <html lang="es">
 <head>
@@ -138,6 +139,12 @@ body{background:var(--navy);color:var(--text);font-family:'Syne',sans-serif;min-
     <svg width="15" height="15" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
     Analizar
   </button>
+
+  <hr class="divider"/>
+  <button class="analyze-btn" id="flowBtn" onclick="runFlow()" style="background:var(--navy3);color:var(--green);border:1px solid var(--green);">
+    <svg width="15" height="15" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg>
+    Flow Scanner
+  </button>
   <div class="disclaimer">⚠️ Solo para fines educativos. No constituye asesoramiento financiero ni de inversión. Consulta a un asesor certificado antes de operar.</div>
 </aside>
 
@@ -206,8 +213,9 @@ async function run(){
     clearInterval(iv);
     document.getElementById('loadingScreen').style.display='none';
     document.getElementById('abtn').disabled=false;
-    errArea.innerHTML='<div class="err-box"><strong>Error:</strong> '+e.message+'</div>';
+    errArea.innerHTML='<div class="err-box"><strong>Error:</strong> '+e.message+'<br><small style="opacity:.7">Ticker: '+raw+' | Revisa la consola (F12) para mas detalles</small></div>';
     errArea.style.display='block';
+    document.getElementById('welcome').style.display='none';
     return;
   }
   const c=gc(r.senales?.primaria);
@@ -219,6 +227,73 @@ async function run(){
   document.getElementById('abtn').disabled=false;
   loadTV(tvSym,ra);showP(0);
 }
+
+async function runFlow(){
+  document.getElementById('welcome').style.display='none';
+  document.getElementById('resultArea').style.display='none';
+  document.getElementById('loadingScreen').style.display='none';
+  document.getElementById('flowArea').style.display='block';
+  document.getElementById('flowLoading').style.display='block';
+  document.getElementById('flowTable').innerHTML='';
+  document.getElementById('flowError').style.display='none';
+  try{
+    const res=await fetch('/.netlify/functions/flow');
+    const data=await res.json();
+    document.getElementById('flowLoading').style.display='none';
+    if(data.error&&(!data.contracts||data.contracts.length===0)){
+      document.getElementById('flowError').innerHTML='<div class="err-box">'+data.error+'</div>';
+      document.getElementById('flowError').style.display='block';
+      return;
+    }
+    const contracts=data.contracts||[];
+    if(contracts.length===0){
+      document.getElementById('flowTable').innerHTML='<div style="text-align:center;padding:2rem;color:var(--text2);font-size:13px;">No se encontraron contratos con esos filtros en este momento.</div>';
+      return;
+    }
+    let rows=contracts.map(c=>{
+      const isPut=c.type==='PUT';
+      const prem=c.premium>=1000000?'<span style="color:var(--green);font-weight:700;">$'+formatNum(c.premium)+'</span>':'$'+formatNum(c.premium);
+      const typeColor=isPut?'var(--red)':'var(--green)';
+      return '<tr style="border-bottom:1px solid var(--border);">'+
+        '<td style="padding:10px 8px;font-weight:600;font-family:DM Mono,monospace;color:var(--text);">'+c.symbol+'</td>'+
+        '<td style="padding:10px 8px;"><span style="color:'+typeColor+';font-weight:600;font-size:11px;padding:2px 7px;border:1px solid '+typeColor+';border-radius:20px;">'+c.type+'</span></td>'+
+        '<td style="padding:10px 8px;font-family:DM Mono,monospace;color:var(--text2);">$'+c.strike+'</td>'+
+        '<td style="padding:10px 8px;font-size:12px;color:var(--text2);">'+c.expiry+'</td>'+
+        '<td style="padding:10px 8px;font-family:DM Mono,monospace;color:var(--text);">'+c.delta.toFixed(2)+'</td>'+
+        '<td style="padding:10px 8px;font-family:DM Mono,monospace;color:var(--text);">'+formatNum(c.volume)+'</td>'+
+        '<td style="padding:10px 8px;font-family:DM Mono,monospace;color:var(--text2);">'+formatNum(c.oi)+'</td>'+
+        '<td style="padding:10px 8px;">'+prem+'</td>'+
+        '<td style="padding:10px 8px;font-size:12px;color:var(--text2);">'+(c.iv*100).toFixed(1)+'%</td>'+
+        '<td style="padding:10px 8px;"><button onclick="document.getElementById('ticker').value=''+c.symbol+'';run();" style="padding:4px 10px;font-size:11px;border:1px solid var(--border2);border-radius:6px;background:transparent;color:var(--text2);cursor:pointer;">Analizar</button></td>'+
+      '</tr>';
+    }).join('');
+    document.getElementById('flowTable').innerHTML=
+      '<div style="overflow-x:auto;"><table style="width:100%;border-collapse:collapse;font-size:13px;">'+
+      '<thead><tr style="border-bottom:1px solid var(--border2);">'+
+      '<th style="padding:8px;text-align:left;font-size:10px;color:var(--text3);text-transform:uppercase;letter-spacing:.06em;">Symbol</th>'+
+      '<th style="padding:8px;text-align:left;font-size:10px;color:var(--text3);text-transform:uppercase;letter-spacing:.06em;">Tipo</th>'+
+      '<th style="padding:8px;text-align:left;font-size:10px;color:var(--text3);text-transform:uppercase;letter-spacing:.06em;">Strike</th>'+
+      '<th style="padding:8px;text-align:left;font-size:10px;color:var(--text3);text-transform:uppercase;letter-spacing:.06em;">Expira</th>'+
+      '<th style="padding:8px;text-align:left;font-size:10px;color:var(--text3);text-transform:uppercase;letter-spacing:.06em;">Delta</th>'+
+      '<th style="padding:8px;text-align:left;font-size:10px;color:var(--text3);text-transform:uppercase;letter-spacing:.06em;">Volumen</th>'+
+      '<th style="padding:8px;text-align:left;font-size:10px;color:var(--text3);text-transform:uppercase;letter-spacing:.06em;">OI</th>'+
+      '<th style="padding:8px;text-align:left;font-size:10px;color:var(--text3);text-transform:uppercase;letter-spacing:.06em;">Premium</th>'+
+      '<th style="padding:8px;text-align:left;font-size:10px;color:var(--text3);text-transform:uppercase;letter-spacing:.06em;">IV</th>'+
+      '<th style="padding:8px;"></th>'+
+      '</tr></thead><tbody>'+rows+'</tbody></table></div>';
+  }catch(e){
+    document.getElementById('flowLoading').style.display='none';
+    document.getElementById('flowError').innerHTML='<div class="err-box">Error: '+e.message+'</div>';
+    document.getElementById('flowError').style.display='block';
+  }
+}
+function formatNum(n){
+  if(!n) return '0';
+  if(n>=1000000) return (n/1000000).toFixed(1)+'M';
+  if(n>=1000) return (n/1000).toFixed(1)+'K';
+  return n.toString();
+}
+
 </script>
 </body>
 </html>
